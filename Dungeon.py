@@ -16,6 +16,7 @@ while True:
         armor = 0
         poison_resist = False
         debuff_resist = False
+        strength = 0
         inventory = []
 
         def __init__(self, max_hp, hp, max_ap, ap):
@@ -29,26 +30,28 @@ while True:
 
     class PlayerAttack(object):
 
-        def __init__(self, name, min_dmg, max_dmg, ap_cost):
+        def __init__(self, name, min_dmg, max_dmg, accuracy, ap_cost):
             self.name = name
             self.min_dmg = min_dmg
             self.max_dmg = max_dmg
+            self.accuracy = accuracy
             self.ap_cost = ap_cost
 
-    slash = PlayerAttack("Slash", 2, 3, 1)
-    shredding_strike = PlayerAttack("Shredding Strike", 4, 5, 3)
+    slash = PlayerAttack("Slash", player.strength + 2, player.strength + 3, 100, 1)
+    shredding_strike = PlayerAttack("Shredding Strike", player.strength + 4, player.strength + 5, 95, 3)
 
     class Armor(object):
 
-        def __init__(self, name, protection, poison_resist, debuff_resist):
+        def __init__(self, name, protection, cost, poison_resist, debuff_resist):
             self.name = name
             self.protection = protection
+            self.cost = cost
             self.poison_resist = poison_resist
             self.debuff_resist = debuff_resist
 
-    gambeson = Armor("Gambeson", 1, False, False)
-    chain_mail = Armor("Chain Mail Armor", 2, True, False)
-    plate_armor = Armor("Plate Armor", 3, True, True)
+    gambeson = Armor("Gambeson", 1, 10, False, False)
+    chain_mail = Armor("Chain Mail Armor", 2, 20, True, False)
+    plate_armor = Armor("Plate Armor", 3, 30, True, True)
 
     # ----------------------------------------------
 
@@ -83,7 +86,8 @@ while True:
 
     # Functions----------------------------------------------------------------
     def player_info():
-        print("HP: {}/{}\nAP: {}/{}   Gold: {}".format(player.hp, player.max_hp, player.ap, player.max_ap, player.gold))
+        print("HP: {}/{}   Armor: {}\nAP: {}/{}   Gold: {}".format(player.hp, player.max_hp, player.armor
+                                                            ,player.ap, player.max_ap, player.gold))
         alt_line()
 
     def monster_info():
@@ -125,17 +129,17 @@ while True:
                     if poison_acc > rand_monster.accuracy + 5:
                         player.poisoned = True
                         print("The {} poisoned you (-1 hp every turn)".format(rand_monster.name))
-                        poison()
+                        poison_func()
                 if rand_monster.debuff is True:
                     debuff_acc = random.randint(1, 10)
                     if debuff_acc > rand_monster.accuracy + 5:
                         player.debuffed = True
                         print("The {} weakened you (-1 armor and -3 max AP)".format(rand_monster.name))
-                        debuff()
+                        debuff_func()
             else:
                 print("The {}'s attack missed!".format(rand_monster.name))
 
-    def poison():
+    def poison_func():
         def poison_apply():
             player.hp -= 1
             print("You have taken 1 damage from being poisoned")
@@ -152,7 +156,7 @@ while True:
                 poison_apply()
 
 
-    def debuff():
+    def debuff_func():
         def debuff_apply():
             global already_debuffed
 
@@ -243,6 +247,11 @@ while True:
     def invalid_option():
         print("************************\nChoose a valid option\n************************")
 
+    def no_gold():
+        line()
+        print("Not enough gold")
+        line()
+
     def dungeon():
         global dungeon_loop
 
@@ -292,24 +301,53 @@ while True:
                 monster_damage()
 
             recover()
-            poison()
+            poison_func()
             ap_gain()
 
     def armor_shop():
         shop_loop = True
         while shop_loop is True:
+            player_info()
             player_input = input("Welcome to the Armor Shop!\nWhat will you buy?\n1: Gambeson Armor\n"
                                  "2: Chain Mail Armor\n3: Plate Armor\nq: Go back to town\n> ")
             if player_input == "1":
-                print("You purchased Gambeson Armor!")
+                if player.gold >= gambeson.cost:
+                    if player.armor >= gambeson.protection:
+                        print("You can't purchase this")
+                    else:
+                        player.armor = gambeson.protection
+                        print("You purchased Gambeson Armor!\n+1 Armor")
+                else:
+                    no_gold()
             elif player_input == "2":
-                print("You purchased Chain Mail Armor!")
+                if player.gold >= chain_mail.cost:
+                    if player.armor >= chain_mail.protection:
+                        print("You can't purchase this")
+                    else:
+                        player.armor = chain_mail.protection
+                        print("You purchased Chain Mail Armor!")
+                else:
+                    no_gold()
             elif player_input == "3":
-                print("You purchased Plate Armor!")
+                if player.gold >= plate_armor.cost:
+                    if player.armor >= plate_armor.protection:
+                        print("You can't purchase this")
+                    else:
+                        player.armor = plate_armor.protection
+                        print("You purchased Plate Armor!")
+                else:
+                    no_gold()
             elif player_input.lower() == "q":
                 shop_loop = False
             else:
                 invalid_option()
+
+    def weapon_shop():
+        shop_loop = True
+        while shop_loop is True:
+            player_info()
+            player_input = input("Welcome to the Weapon Shop!\nWhat will you buy?\n1: Gambeson Armor\n"
+                                 "2: Chain Mail Armor\n3: Plate Armor\nq: Go back to town\n> ")
 
     def town():
         global dungeon_loop
@@ -386,3 +424,10 @@ while True:
             break
         town()
     break
+
+"""Ideas
+-monsters drop treasure that you can sell in town
+-after a certain amount of defeated enemies, player is able to choose a different path
+-passive money making building to purchase in town
+-merchant who can upgrade your max hp and ap
+"""
