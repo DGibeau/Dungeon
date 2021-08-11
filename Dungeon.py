@@ -53,6 +53,16 @@ while True:
     chain_mail = Armor("Chain Mail Armor", 2, 20, True, False)
     plate_armor = Armor("Plate Armor", 3, 30, True, True)
 
+    class Weapon(object):
+
+        def __init__(self, name, dmg, cost, crit_chance):
+            self.name = name
+            self.dmg = dmg
+            self.cost = cost
+            self.crit_chance = crit_chance
+
+    short_sword = Weapon("Short Sword", 1, 20, 1)
+
     # ----------------------------------------------
 
     class Monster(object):
@@ -348,6 +358,37 @@ while True:
             player_info()
             player_input = input("Welcome to the Weapon Shop!\nWhat will you buy?\n1: Gambeson Armor\n"
                                  "2: Chain Mail Armor\n3: Plate Armor\nq: Go back to town\n> ")
+            if player_input == "1":
+                if player.gold >= short_sword.cost:
+                    if player.armor >= gambeson.protection:
+                        print("You can't purchase this")
+                    else:
+                        player.armor = gambeson.protection
+                        print("You purchased Gambeson Armor!\n+1 Armor")
+                else:
+                    no_gold()
+            elif player_input == "2":
+                if player.gold >= chain_mail.cost:
+                    if player.armor >= chain_mail.protection:
+                        print("You can't purchase this")
+                    else:
+                        player.armor = chain_mail.protection
+                        print("You purchased Chain Mail Armor!")
+                else:
+                    no_gold()
+            elif player_input == "3":
+                if player.gold >= plate_armor.cost:
+                    if player.armor >= plate_armor.protection:
+                        print("You can't purchase this")
+                    else:
+                        player.armor = plate_armor.protection
+                        print("You purchased Plate Armor!")
+                else:
+                    no_gold()
+            elif player_input.lower() == "q":
+                shop_loop = False
+            else:
+                invalid_option()
 
     def town():
         global dungeon_loop
