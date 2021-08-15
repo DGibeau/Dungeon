@@ -1,3 +1,6 @@
+# Current bugs: armor loss/add is bugged
+#               had 12% armor and when weakened it went to 4%, displayed -4% after recovered
+#               take poison dmg same turn it is applied
 while True:
     import random
 
@@ -15,7 +18,7 @@ while True:
     class Player(object):
         poisoned = False
         debuffed = False
-        gold = 0
+        gold = 6969
         inventory = []
 
         def __init__(self, max_hp, hp, max_ap, ap, weapon, armor):
@@ -52,19 +55,18 @@ while True:
 
     class Weapon(object):
 
-        def __init__(self, name, bonus_dmg, cost, crit_dmg1, crit_dmg2, crit_chance):
+        def __init__(self, name, bonus_dmg, cost, crit_mult, crit_chance):
             self.name = name
             self.bonus_dmg = bonus_dmg
             self.cost = cost
-            self.crit_dmg1 = crit_dmg1
-            self.crit_dmg2 = crit_dmg2
+            self.crit_mult = crit_mult
             self.crit_chance = crit_chance
 
     # weapon types
-    dagger = Weapon("Dagger", 0, 0, 1, 3, 10)
-    short_sword = Weapon("Short Sword", 3, 20, 3, 5, 10)
-    battle_axe = Weapon("Battle Axe", 5, 40, 7, 9, 10)
-    long_sword = Weapon("Long Sword", 9, 60, 9, 11, 10)
+    dagger = Weapon("Dagger", 0, 0, 1.4, 10)
+    short_sword = Weapon("Short Sword", 3, 20, 1.5, 10)
+    battle_axe = Weapon("Battle Axe", 5, 40, 1.6, 10)
+    long_sword = Weapon("Long Sword", 9, 60, 1.7, 10)
 
     # ----------------------------------------------
 
@@ -118,8 +120,7 @@ while True:
             player.ap -= ap_cost
             crit_check = random.randint(1, 100)
             if crit_check <= player.weapon.crit_chance:
-                crit_dmg = random.randint(player.weapon.crit_dmg1, player.weapon.crit_dmg2)
-                player_dmg = random.randint(min_dmg, max_dmg) + player.weapon.bonus_dmg + crit_dmg
+                player_dmg = round((random.randint(min_dmg, max_dmg) + player.weapon.bonus_dmg) * player.weapon.crit_mult)
                 rand_monster.hp -= player_dmg
                 print("************************\nCRITICAL HIT!\n************************\n"
                       "You used {} and did {} damage".format(attack_name, player_dmg))
@@ -302,11 +303,6 @@ while True:
                 else:
                     invalid_option()
 
-            restart()
-
-            if restart() is True or False:
-                break
-
             if rand_monster.hp <= 0:
                 print("You defeated the {}!".format(rand_monster.name))
                 rewards()
@@ -326,6 +322,9 @@ while True:
             else:
                 monster_damage()
 
+            restart()
+            if Game.restart_boolean is True or False:
+                break
             recover()
             poison_func()
             ap_gain()
@@ -334,33 +333,53 @@ while True:
         while True:
             player_info()
             # ADD PRICES ##################################
-            player_input = input("Welcome to the Armor Shop!\nWhat will you buy?\n1: Gambeson Armor\n"
-                                 "2: Chain Mail Armor\n3: Plate Armor\nq: Go back to town\n> ")
+            player_input = input("Welcome to the Armor Shop!\nWhat will you buy?\n"
+                                 "1: Gambeson | {} Gold (+{}% Armor)\n"
+                                 "2: Chain Mail Armor | {} Gold (+{}% Armor & +20% poison resistance)\n"
+                                 "3: Plate Armor | {} Gold (+{}% Armor & +20% poison & weaken resistance)\n"
+                                 "q: Go back to town\n> ".format(gambeson.cost, int((1 - gambeson.protection) * 100),
+                                                            chain_mail.cost, int((1 - chain_mail.protection) * 100),
+                                                            plate_armor.cost, int((1 - plate_armor.protection) * 100)))
             if player_input == "1":
                 if player.gold >= gambeson.cost:
-                    if player.armor >= gambeson.protection:
+                    if player.armor.protection <= gambeson.protection:
+                        line()
                         print("You can't purchase this")
+                        line()
                     else:
-                        player.armor = gambeson.protection
-                        print("You purchased Gambeson Armor!\n+1 Armor")
+                        player.gold -= gambeson.cost
+                        player.armor = gambeson
+                        line()
+                        print("You purchased {}!".format(gambeson.name))
+                        line()
                 else:
                     no_gold()
             elif player_input == "2":
                 if player.gold >= chain_mail.cost:
-                    if player.armor >= chain_mail.protection:
+                    if player.armor.protection <= chain_mail.protection:
+                        line()
                         print("You can't purchase this")
+                        line()
                     else:
-                        player.armor = chain_mail.protection
-                        print("You purchased Chain Mail Armor!")
+                        player.gold -= chain_mail.cost
+                        player.armor = chain_mail
+                        line()
+                        print("You purchased {}!".format(chain_mail.name))
+                        line()
                 else:
                     no_gold()
             elif player_input == "3":
                 if player.gold >= plate_armor.cost:
-                    if player.armor >= plate_armor.protection:
+                    if player.armor.protection <= plate_armor.protection:
+                        line()
                         print("You can't purchase this")
+                        line()
                     else:
-                        player.armor = plate_armor.protection
-                        print("You purchased Plate Armor!")
+                        player.gold -= plate_armor.cost
+                        player.armor = plate_armor
+                        line()
+                        print("You purchased {}!".format(plate_armor.name))
+                        line()
                 else:
                     no_gold()
             elif player_input.lower() == "q":
@@ -371,39 +390,63 @@ while True:
     def weapon_shop():
         while True:
             player_info()
-            player_input = input("Welcome to the Weapon Shop!\nWhat will you buy?\n1: Gambeson Armor\n"
-                                 "2: Chain Mail Armor\n3: Plate Armor\nq: Go back to town\n> ")
+            player_input = input("Welcome to the Weapon Shop!\nWhat will you buy?\n"
+                                 "1: Short Sword | {} Gold (+{} dmg, x{} crit multiplier)\n"
+                                 "2: Battle Axe | {} Gold (+{} dmg, x{} crit multiplier)\n"
+                                 "3: Long Sword | {} Gold (+{} dmg, x{} crit multiplier)\n"
+                                 "q: Go back to town\n> ".format(short_sword.cost, short_sword.bonus_dmg,
+                                                                 short_sword.crit_mult,
+                                                        battle_axe.cost, battle_axe.bonus_dmg, battle_axe.crit_mult,
+                                                        long_sword.cost, long_sword.bonus_dmg, long_sword.crit_mult))
             if player_input == "1":
                 if player.gold >= short_sword.cost:
-                    if player.armor >= gambeson.protection:
+                    if player.weapon.bonus_dmg >= short_sword.bonus_dmg:
+                        line()
                         print("You can't purchase this")
+                        line()
                     else:
-                        player.armor = gambeson.protection
-                        print("You purchased Gambeson Armor!\n+1 Armor")
+                        player.gold -= short_sword.cost
+                        player.weapon = short_sword
+                        line()
+                        print("You purchased a {}!".format(short_sword.name))
+                        line()
                 else:
                     no_gold()
             elif player_input == "2":
-                if player.gold >= chain_mail.cost:
-                    if player.armor >= chain_mail.protection:
+                if player.gold >= battle_axe.cost:
+                    if player.weapon.bonus_dmg >= battle_axe.bonus_dmg:
+                        line()
                         print("You can't purchase this")
+                        line()
                     else:
-                        player.armor = chain_mail.protection
-                        print("You purchased Chain Mail Armor!")
+                        player.gold -= battle_axe.cost
+                        player.weapon = battle_axe
+                        line()
+                        print("You purchased a {}!".format(battle_axe.name))
+                        line()
                 else:
                     no_gold()
             elif player_input == "3":
-                if player.gold >= plate_armor.cost:
-                    if player.armor >= plate_armor.protection:
+                if player.gold >= long_sword.cost:
+                    if player.weapon.bonus_dmg >= long_sword.bonus_dmg:
+                        line()
                         print("You can't purchase this")
+                        line()
                     else:
-                        player.armor = plate_armor.protection
-                        print("You purchased Plate Armor!")
+                        player.gold -= long_sword.cost
+                        player.weapon = long_sword
+                        line()
+                        print("You purchased a {}!".format(long_sword.name))
+                        line()
                 else:
                     no_gold()
             elif player_input.lower() == "q":
                 break
             else:
                 invalid_option()
+
+    def potion_shop():
+        print("Welcome to the potion shop!")
 
     def town():
         if Game.dungeon_loop is False:
@@ -415,9 +458,9 @@ while True:
                 if player_input == "1":
                     armor_shop()
                 elif player_input == "2":
-                    print("Welcome to the Weapon Shop!")
+                    weapon_shop()
                 elif player_input == "3":
-                    print("Welcome to the Potion Shop")
+                    potion_shop()
                 elif player_input == "4":
                     town_loop = False
                     Game.dungeon_loop = True
@@ -439,36 +482,36 @@ while True:
                     Game.dungeon_loop = False
                     Game.restart_boolean = False
                     Game.restart_once = 1
-                    break
                 elif player_input.lower() == "y":
                     Game.dungeon_loop = False
                     Game.restart_boolean = True
+                    Game.game_over = False
                     Game.restart_once = 1
-                    break
                 else:
                     invalid_option()
-        return Game.restart_boolean
 
     def quit_func():
-        while Game.quit_once == 0:
-            player_input = input("Are you sure? (y/n)\n> ")
-            if player_input.lower() == "y":
-                Game.game_over = True
-                Game.quit_boolean = True
-                Game.quit_once = 1
-            elif player_input.lower() == "n":
-                Game.quit_boolean = False
-                Game.quit_once = 1
-            else:
-                invalid_option()
+        if player.hp > 0:
+            while Game.quit_once == 0:
+                player_input = input("Are you sure? (y/n)\n> ")
+                if player_input.lower() == "y":
+                    Game.game_over = True
+                    Game.quit_boolean = True
+                    Game.quit_once = 1
+                elif player_input.lower() == "n":
+                    Game.quit_boolean = False
+                    Game.quit_once = 1
+                else:
+                    invalid_option()
         Game.quit_once = 0
 
     # Game Start------------------------------------------------------------------
     while Game.game_over is False:
-        if restart() is True or False:
+        if Game.restart_boolean is True or False:
             break
         town()
-    break
+    if Game.restart_boolean is False or Game.quit_boolean is True:
+        break
 
 """Ideas
 -monsters drop treasure that you can sell in town
