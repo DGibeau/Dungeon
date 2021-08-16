@@ -1,6 +1,4 @@
-# Current bugs: armor loss/add is bugged
-#               had 12% armor and when weakened it went to 4%, displayed -4% after recovered
-#               take poison dmg same turn it is applied
+# Current bugs: coming soon
 while True:
     import random
 
@@ -14,11 +12,14 @@ while True:
         quit_boolean = ''
         restart_once = 0
         quit_once = 0
+        turns_staggered = 0
 
     class Player(object):
         poisoned = False
         debuffed = False
-        gold = 6969
+        stagger_value = 15
+        gold = 0
+        max_inventory = 3
         inventory = []
 
         def __init__(self, max_hp, hp, max_ap, ap, weapon, armor):
@@ -68,75 +69,204 @@ while True:
     battle_axe = Weapon("Battle Axe", 5, 40, 1.6, 10)
     long_sword = Weapon("Long Sword", 9, 60, 1.7, 10)
 
-    # ----------------------------------------------
+    class Potion(object):
+
+        def __init__(self, name, short_name, effect_value, cost):
+            self.name = name
+            self.short_name = short_name
+            self.effect_value = effect_value
+            self.cost = cost
+
+    hp_potion = Potion("HP Potion", "HP", 40, 10)
+    ap_potion = Potion("AP Potion", "AP", 4, 10)
+    dmg_potion = Potion("Blast Potion", "dmg", 25, 10)
+
+    # ------------------------------------------------------------------------------------
 
     class Monster(object):
     # I created a monster list to be able to get a random monster from it
-        species = 'monster'
+        staggered = False
         gold_drop = 1
-        min_poison = 7
+        min_poison = 5
         max_poison = 10
         monster_list = []
 
-        def __init__(self, name, max_hp, hp, min_dmg, max_dmg, accuracy, poison, debuff):
+        def __init__(self, name, max_hp, hp, min_dmg, max_dmg, accuracy, stagger_resist, poison, debuff):
             self.name = name
             self.max_hp = max_hp
             self.hp = hp
             self.min_dmg = min_dmg
             self.max_dmg = max_dmg
             self.accuracy = accuracy
+            self.stagger_resist = stagger_resist
             self.poison = poison
             self.debuff = debuff
             __class__.monster_list.append(self)
 
     # Monster types
-    goblin = Monster("Goblin", 80, 80, 10, 30, 90, False, False)
-    spider = Monster("Giant Spider", 70, 70, 10, 20, 90, False, True)
-    orc = Monster("Orc", 110, 110, 25, 40, 85, False, False)
-    skeleton = Monster("Skeleton", 90, 90, 20, 30, 90, False, False)
-    slime = Monster("Slime", 105, 105, 10, 15, 90, True, False)
-    zombie = Monster("Zombie", 80, 80, 10, 30, 80, True, True)
+    goblin = Monster("Goblin", 80, 80, 10, 30, 90, 20, False, False)
+    spider = Monster("Giant Spider", 70, 70, 10, 20, 90, 25, False, True)
+    orc = Monster("Orc", 115, 115, 25, 40, 85, 70, False, False)
+    skeleton = Monster("Skeleton", 90, 90, 20, 30, 90, 15, False, False)
+    slime = Monster("Slime", 110, 110, 10, 15, 90, 70, True, False)
+    zombie = Monster("Zombie", 80, 80, 10, 30, 85, 20, True, True)
 
     rand_index = random.randrange(len(Monster.monster_list))
     rand_monster = Monster.monster_list[rand_index]
 
-    player = Player(120, 120, 10, 10, dagger, cloth)
+    player = Player(120, 120, 12, 12, dagger, cloth)
 
     # Attack types
-    slash = PlayerAttack("Slash", 15, 25, 10, 1)
-    shredding_strike = PlayerAttack("Shredding Strike", 30, 40, 5, 3)
+    slash = PlayerAttack("Slash", 15, 25, 5, 1)
+    shredding_strike = PlayerAttack("Shredding Strike", 30, 40, 0, 3)
+    stagger_stab = PlayerAttack("Stagger Stab", 12, 15, 10, 2)
+    critical_cleave = PlayerAttack("Critical Cleave", 15, 20, 30, 5)
 
-    #print("This {} is a {} and its hp is {}.".format(rand_monster.species, rand_monster.name, rand_monster.hp))
+
+    class TavernOption(object):
+
+        def __init__(self, name, cost, effect1, effect2):
+            self.name = name
+            self.cost = cost
+            self.effect1 = effect1
+            self.effect2 = effect2
+
+
+    drink = TavernOption("Drink", 5, 2, 0.03)
+    meal = TavernOption("Meal", 10, 40, 2)
+    sleep = TavernOption("Sleep", 25, player.max_hp, player.max_ap)
 
     # Functions----------------------------------------------------------------
     def player_info():
-        print("HP: {}/{}  Armor: {}%\nAP: {}/{}    Gold: {}".format(player.hp, player.max_hp,
-                                                                    int((1 - player.armor.protection) * 100)
+        if player.poisoned is True:
+            print("HP: {}/{}▼  Armor: {}%\nAP: {}/{}    Gold: {}".format(player.hp, player.max_hp,
+                                                                        int((1 - player.armor.protection) * 100)
+                                                                        , player.ap, player.max_ap, player.gold))
+        else:
+            print("HP: {}/{}  Armor: {}%\nAP: {}/{}    Gold: {}".format(player.hp, player.max_hp,
+                                                            int((1 - player.armor.protection) * 100)
                                                             ,player.ap, player.max_ap, player.gold))
+        for item in player.inventory:
+            print(item.name, end = " | ")
+        if len(player.inventory) != 0:
+            print("")
         alt_line()
 
-    def player_damage(ap_cost, min_dmg, max_dmg, attack_name):
+    def player_damage(ap_cost, min_dmg, max_dmg, attack_name, attack_crit):
         if player.ap >= ap_cost:
             player.ap -= ap_cost
             crit_check = random.randint(1, 100)
-            if crit_check <= player.weapon.crit_chance:
-                player_dmg = round((random.randint(min_dmg, max_dmg) + player.weapon.bonus_dmg) * player.weapon.crit_mult)
-                rand_monster.hp -= player_dmg
-                print("************************\nCRITICAL HIT!\n************************\n"
-                      "You used {} and did {} damage".format(attack_name, player_dmg))
+            if crit_check <= player.weapon.crit_chance + attack_crit:
+                if attack_name == critical_cleave.name and rand_monster.hp > 99:
+                        player_dmg = round(
+                            (random.randint(min_dmg, max_dmg) + player.weapon.bonus_dmg) * (2 + player.weapon.crit_mult))
+                        rand_monster.hp -= player_dmg
+                        print("************************\nSUPER CRITICAL HIT!\n************************\n"
+                              "You used {} and did {} damage".format(attack_name, player_dmg))
+                else:
+                    player_dmg = round((random.randint(min_dmg, max_dmg) + player.weapon.bonus_dmg)
+                                       * player.weapon.crit_mult)
+                    rand_monster.hp -= player_dmg
+                    print("************************\nCRITICAL HIT!\n************************\n"
+                          "You used {} and did {} damage".format(attack_name, player_dmg))
             else:
                 player_dmg = random.randint(min_dmg, max_dmg) + player.weapon.bonus_dmg
                 rand_monster.hp -= player_dmg
                 print("You used {} and did {} damage".format(attack_name, player_dmg))
         else:
-            print("Not enough AP")
+            print("************************\nNot enough AP\n************************")
+
+    def inventory_func():
+        def item_choice(slot):
+            if player.inventory[slot] == hp_potion:
+                player.hp += hp_potion.effect_value
+                if player.hp > player.max_hp:
+                    player.hp = player.max_hp
+                del player.inventory[slot]
+                line()
+                print("You drank the {} and gained {} HP".format(hp_potion.name, hp_potion.effect_value))
+                if player.poisoned is True:
+                    player.poisoned = False
+                    Game.already_poisoned = False
+                    print("You cured the poison")
+                line()
+            elif player.inventory[slot] == ap_potion:
+                line()
+                if player.debuffed is True:
+                    player.debuffed = False
+                    Game.already_debuffed = False
+                    player.max_ap = 12
+                    player.armor.protection -= 0.08
+                    print("You cured the weaken")
+                player.ap += ap_potion.effect_value
+                del player.inventory[slot]
+                print("You drank the {} and gained {} AP".format(ap_potion.name, ap_potion.effect_value))
+                line()
+                if player.ap > player.max_ap:
+                    player.ap = player.max_ap
+            elif player.inventory[slot] == dmg_potion:
+                rand_monster.hp -= dmg_potion.effect_value
+                del player.inventory[slot]
+                line()
+                print("You used the {} and did {} damage to the {}".format(dmg_potion.name,
+                                                                dmg_potion.effect_value, rand_monster.name))
+                line()
+
+        item_num = 1
+        while True:
+            for item in player.inventory:
+                print(str(item_num) + ": " + item.name + " | {} {}".format(item.effect_value, item.short_name))
+                item_num += 1
+            player_input = input("q: go back\n> ")
+            if player_input == "1":
+                item_choice(0)
+                break
+            elif player_input == "2":
+                if len(player.inventory) >= 2:
+                    item_choice(1)
+                    break
+            elif player_input == "3":
+                if len(player.inventory) >= 3:
+                    item_choice(2)
+                    break
+            elif player_input.lower() == "q":
+                break
+            else:
+                invalid_option()
+                item_num -= 1
+
+    def stagger_func():
+        rand_stagger = random.randint(1, 100)
+        if rand_stagger >= rand_monster.stagger_resist:
+            if rand_monster.staggered is False:
+                rand_monster.staggered = True
+                rand_monster.accuracy -= player.stagger_value
+                print("The {} has been staggered".format(rand_monster.name))
+            elif rand_monster.staggered is True:
+                print("The {} is already staggered".format(rand_monster.name))
+        else:
+            print("The {} resisted the stagger ({}s have a {}% chance to resist)".format(
+                    rand_monster.name, rand_monster.name, rand_monster.stagger_resist))
+
+    def stagger_recover():
+        if rand_monster.staggered is True:
+            Game.turns_staggered += 1
+            if Game.turns_staggered >= 3:
+                rand_monster.staggered = False
+                rand_monster.accuracy += player.stagger_value
+                Game.turns_staggered = 0
+                print("The {} recovered from being staggered".format(rand_monster.name))
 
     def monster_info():
         if Game.new_monster is True:
             print("A {} has appeared!\n".format(rand_monster.name))
             Game.new_monster = False
 
-        print("{} HP: {}/{}".format(rand_monster.name, rand_monster.hp, rand_monster.max_hp))
+        if rand_monster.staggered is True:
+            print("{} HP: {}/{}".format(rand_monster.name, rand_monster.hp, rand_monster.max_hp), end=" ")
+            print("-{}% Acc".format(player.stagger_value))
+        elif rand_monster.staggered is False:
+            print("{} HP: {}/{}".format(rand_monster.name, rand_monster.hp, rand_monster.max_hp))
 
     def monster_accuracy():
         monster_acc = random.randint(1, 100)
@@ -152,6 +282,10 @@ while True:
         if rand_monster.hp <= 0 or Game.new_monster is True:
             Game.new_monster = True
             rand_monster.hp = rand_monster.max_hp
+            if rand_monster.staggered is True:
+                rand_monster.accuracy += 20
+                rand_monster.staggered = False
+                Game.turns_staggered = 0
             rand_index = random.randrange(len(Monster.monster_list))
             rand_monster = Monster.monster_list[rand_index]
 
@@ -163,8 +297,8 @@ while True:
                 print("You have taken {} damage from the {}".format(monster_dmg, rand_monster.name))
                 if rand_monster.poison is True:
                     poison_acc = random.randint(1, 100)
-                    # 90 - 55 = 35% | 80 - 55 = 25%
-                    if poison_acc <= rand_monster.accuracy - 55:
+                    # 90 - 55 = 35% | 85 - 55 = 30%
+                    if poison_acc <= rand_monster.accuracy - 55 and Game.already_poisoned is False:
                         player.poisoned = True
                         print("The {} poisoned you (-{} to {} HP every turn)".format(rand_monster.name,
                                                     rand_monster.min_poison, rand_monster.max_poison))
@@ -178,13 +312,6 @@ while True:
                 print("The {}'s attack missed!".format(rand_monster.name))
 
     def poison_func():
-        def poison_apply():
-            if Game.already_poisoned is False:
-                Game.already_poisoned = True
-                poison_dmg = random.randint(rand_monster.min_poison, rand_monster.max_poison)
-                player.hp -= poison_dmg
-                print("You have taken {} damage from being poisoned".format(poison_dmg))
-
         if player.poisoned is True:
             if player.armor.poison_resist is True:
                 rand_resist = random.randint(1, 100)
@@ -193,10 +320,16 @@ while True:
                     player.poisoned = False
                     print("You resisted the poison")
                 else:
-                    poison_apply()
+                    Game.already_poisoned = True
             else:
-                poison_apply()
+                Game.already_poisoned = True
 
+
+    def poison_dmg_func():
+        if Game.already_poisoned is True:
+            poison_dmg = random.randint(rand_monster.min_poison, rand_monster.max_poison)
+            player.hp -= poison_dmg
+            print("You have taken {} damage from being poisoned".format(poison_dmg))
 
     def debuff_func():
         def debuff_apply():
@@ -235,16 +368,16 @@ while True:
             if rand_recover <= 20:
                 player.debuffed = False
                 Game.already_debuffed = False
-                player.max_ap = 10
-                player.armor.protection += 0.08
+                player.max_ap = 12
+                player.armor.protection -= 0.08
                 print("You recovered from being weakened")
 
     def rewards():
-        rand_monster.gold_drop = random.randint(1, 5)
+        rand_monster.gold_drop = random.randint(8, 15)
         player.gold += rand_monster.gold_drop
-        rand_hp = random.randint(5, 20)
+        rand_hp = random.randint(20, 30)
         player.hp += rand_hp
-        rand_ap = random.randint(0, 1)
+        rand_ap = random.randint(1, 2)
         player.ap += rand_ap
         print("You gained {} gold".format(rand_monster.gold_drop))
         if player.hp > player.max_hp:
@@ -259,13 +392,12 @@ while True:
             if player.ap > player.max_ap:
                 player.ap = player.max_ap
             else:
-                rand_ap = random.randint(0, 2)
-                if rand_ap != 0:
-                    player.ap += rand_ap
-                    print("You regained {} AP".format(rand_ap))
-                    if player.ap > player.max_ap:
-                        player.ap = player.max_ap
-                    line()
+                rand_ap = random.randint(1, 2)
+                player.ap += rand_ap
+                print("You regained {} AP".format(rand_ap))
+                if player.ap > player.max_ap:
+                    player.ap = player.max_ap
+                line()
 
     def line():
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
@@ -282,24 +414,53 @@ while True:
         line()
 
     def dungeon():
+        def inventory_option():
+            if len(player.inventory) != 0:
+                print("e: Use items")
+
         print("You entered the dungeon")
         while Game.dungeon_loop is True:
+            stagger_recover()
+            poison_dmg_func()
+            recover()
             while True:
                 monster_info()
                 alt_line()
                 player_info()
-                player_input = input("What will you do?\n1: {} ({} AP, {}-{} dmg)".format(slash.name, slash.ap_cost,
-                            slash.min_dmg, slash.max_dmg) + "\n2: {} ({} AP, {}-{} dmg)".format(shredding_strike.name,
-                            shredding_strike.ap_cost, shredding_strike.min_dmg, shredding_strike.max_dmg)
-                            + "\n> ")
+                print("What will you do?\n1: {} ({} AP, {}-{} dmg)\n"
+                                    "2: {} ({} AP, {}-{} dmg)\n"
+                                    "3: {} ({} AP, {}-{} dmg & -{}% enemy accuracy)\n"
+                                    "4: {} ({} AP, {}-{} dmg & {}% crit chance & 3x crit vs 100+ HP enemies)"
+                    .format(slash.name, slash.ap_cost, slash.min_dmg, slash.max_dmg,
+                    shredding_strike.name, shredding_strike.ap_cost, shredding_strike.min_dmg, shredding_strike.max_dmg,
+                    stagger_stab.name, stagger_stab.ap_cost, stagger_stab.min_dmg, stagger_stab.max_dmg, player.stagger_value,
+                    critical_cleave.name, critical_cleave.ap_cost, critical_cleave.min_dmg, critical_cleave.max_dmg,
+                            critical_cleave.crit_chance + player.weapon.crit_chance))
+                inventory_option()
+                player_input = input("> ")
                 line()
                 if player_input == "1":
-                    player_damage(slash.ap_cost, slash.min_dmg, slash.max_dmg, slash.name)
+                    player_damage(slash.ap_cost, slash.min_dmg, slash.max_dmg, slash.name, slash. crit_chance)
                     break
                 elif player_input == "2":
                     player_damage(shredding_strike.ap_cost, shredding_strike.min_dmg, shredding_strike.max_dmg,
-                                  shredding_strike.name)
+                                  shredding_strike.name, shredding_strike.crit_chance)
                     break
+                elif player_input == "3":
+                    player_damage(stagger_stab.ap_cost, stagger_stab.min_dmg, stagger_stab.max_dmg,
+                                  stagger_stab.name, stagger_stab.crit_chance)
+                    stagger_func()
+                    break
+                elif player_input == "4":
+                    player_damage(critical_cleave.ap_cost, critical_cleave.min_dmg, critical_cleave.max_dmg,
+                                  critical_cleave.name, critical_cleave.crit_chance)
+                elif player_input.lower() == "e":
+                    if len(player.inventory) != 0:
+                        inventory_func()
+                        if rand_monster.hp <= 0:
+                            break
+                    else:
+                        invalid_option()
                 else:
                     invalid_option()
 
@@ -325,14 +486,12 @@ while True:
             restart()
             if Game.restart_boolean is True or False:
                 break
-            recover()
-            poison_func()
+
             ap_gain()
 
     def armor_shop():
         while True:
             player_info()
-            # ADD PRICES ##################################
             player_input = input("Welcome to the Armor Shop!\nWhat will you buy?\n"
                                  "1: Gambeson | {} Gold (+{}% Armor)\n"
                                  "2: Chain Mail Armor | {} Gold (+{}% Armor & +20% poison resistance)\n"
@@ -446,14 +605,130 @@ while True:
                 invalid_option()
 
     def potion_shop():
-        print("Welcome to the potion shop!")
+        while True:
+            player_info()
+            player_input = input("Welcome to the Potion Shop!\nWhat will you buy?\n"
+                                 "1: {} | {} Gold (+{} HP on use & cures poison)\n"
+                                 "2: {} | {} Gold (+{} AP on use & cures weaken)\n"
+                                 "3: {} | {} Gold ({} dmg on use)\n"
+                                 "q: Go back to town\n> "
+                                 .format(hp_potion.name, hp_potion.cost, hp_potion.effect_value,
+                                    ap_potion.name, ap_potion.cost, ap_potion.effect_value,
+                                    dmg_potion.name, dmg_potion.cost, dmg_potion.effect_value))
+            if player_input == "1":
+                if player.gold >= hp_potion.cost:
+                    if len(player.inventory) >= player.max_inventory:
+                        line()
+                        print("Your inventory is full")
+                        line()
+                    else:
+                        player.gold -= hp_potion.cost
+                        player.inventory.append(hp_potion)
+                        line()
+                        print("You purchased an {}!".format(hp_potion.name))
+                        line()
+                else:
+                    no_gold()
+            elif player_input == "2":
+                if player.gold >= ap_potion.cost:
+                    if len(player.inventory) >= player.max_inventory:
+                        line()
+                        print("Your inventory is full")
+                        line()
+                    else:
+                        player.gold -= ap_potion.cost
+                        player.inventory.append(ap_potion)
+                        line()
+                        print("You purchased an {}!".format(ap_potion.name))
+                        line()
+                else:
+                    no_gold()
+            elif player_input == "3":
+                if player.gold >= dmg_potion.cost:
+                    if len(player.inventory) >= player.max_inventory:
+                        line()
+                        print("Your inventory is full")
+                        line()
+                    else:
+                        player.gold -= dmg_potion.cost
+                        player.inventory.append(dmg_potion)
+                        line()
+                        print("You purchased a {}!".format(dmg_potion.name))
+                        line()
+                else:
+                    no_gold()
+            elif player_input.lower() == "q":
+                break
+            else:
+                invalid_option()
+
+    def tavern():
+        while True:
+            player_info()
+            player_input = input("You arrive at the Tavern\nWhat will you do?\n"
+                                 "1: Enter\n"
+                                 "2: Enter the alleyway\n"
+                                 "q: Go back to town\n> ")
+            if player_input == "1":
+                while True:
+                    player_info()
+                    player_input = input("Welcome to the Tavern!\nWhat will you do?\n"
+                                    "1: Buy a Drink | 5 gold (+2 AP +3% Armor temporarily)\n"
+                                    "2: Buy a Meal | 10 gold (+40 HP +2 AP)\n"
+                                    "3: Buy a room for the night | 25 gold (restores HP and AP)\n"
+                                    "q: Go back to the tavern\n> ")
+                    if player_input == "1":
+                        if player.gold >= drink.cost:
+                            player.gold -= drink.cost
+                            player.ap += drink.effect1
+                            player.armor.protection -= drink.effect2
+                            if player.ap > player.max_ap:
+                                player.ap = player.max_ap
+                            print("You purchased and drank the {}".format(drink.name))
+                        else:
+                            no_gold()
+                    elif player_input == "2":
+                        if player.gold >= meal.cost:
+                            player.gold -= meal.cost
+                            player.hp += meal.effect1
+                            player.ap += meal.effect2
+                            if player.hp > player.max_hp:
+                                player.hp = player.max_hp
+                            if player.ap > player.max_ap:
+                                player.ap = player.max_ap
+                            print("You purchased and ate the {}".format(meal.name))
+                        else:
+                            no_gold()
+                    elif player_input == "3":
+                        if player.gold >= sleep.cost:
+                            player.gold -= sleep.cost
+                            player.hp += sleep.effect1
+                            player.ap += sleep.effect2
+                            if player.hp > player.max_hp:
+                                player.hp = player.max_hp
+                            if player.ap > player.max_ap:
+                                player.ap = player.max_ap
+                            print("You purchased a room and went to {}\nYou wake up feeling great".format(sleep.name))
+                        else:
+                            no_gold()
+                    elif player_input.lower() == "q":
+                        break
+                    else:
+                        invalid_option()
+                    line()
+            elif player_input == "2":
+                print("Welcome to my special shop, stranger")
+            elif player_input.lower() == "q":
+                break
+            else:
+                invalid_option()
 
     def town():
         if Game.dungeon_loop is False:
             town_loop = True
             while town_loop is True:
                 player_input = input("Welcome to the small village of Seronia!\nWhere will you go?\n1: Armor Shop\n"
-                                     "2: Weapon Shop\n3: Potion Shop\n4: Dungeon\nq: Quit\n> ")
+                                     "2: Weapon Shop\n3: Potion Shop\n4: Tavern\ne: Dungeon\nq: Quit\n> ")
                 line()
                 if player_input == "1":
                     armor_shop()
@@ -462,6 +737,8 @@ while True:
                 elif player_input == "3":
                     potion_shop()
                 elif player_input == "4":
+                    tavern()
+                elif player_input.lower() == "e":
                     town_loop = False
                     Game.dungeon_loop = True
                     dungeon()
