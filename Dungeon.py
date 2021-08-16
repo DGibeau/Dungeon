@@ -17,6 +17,7 @@ while True:
     class Player(object):
         poisoned = False
         debuffed = False
+        temp_armor = False
         stagger_value = 15
         gold = 0
         max_inventory = 3
@@ -50,9 +51,9 @@ while True:
 
     # Armor types
     cloth = Armor("Cloth", 1, 0, False, False)
-    gambeson = Armor("Gambeson", 0.92, 15, False, False)
-    chain_mail = Armor("Chain Mail Armor", 0.9, 30, True, False)
-    plate_armor = Armor("Plate Armor", 0.88, 50, True, True)
+    gambeson = Armor("Gambeson", 0.92, 25, False, False)
+    chain_mail = Armor("Chain Mail Armor", 0.9, 50, True, False)
+    plate_armor = Armor("Plate Armor", 0.88, 90, True, True)
 
     class Weapon(object):
 
@@ -65,9 +66,9 @@ while True:
 
     # weapon types
     dagger = Weapon("Dagger", 0, 0, 1.4, 10)
-    short_sword = Weapon("Short Sword", 3, 20, 1.5, 10)
-    battle_axe = Weapon("Battle Axe", 5, 40, 1.6, 10)
-    long_sword = Weapon("Long Sword", 9, 60, 1.7, 10)
+    short_sword = Weapon("Short Sword", 2, 25, 1.5, 10)
+    battle_axe = Weapon("Battle Axe", 4, 50, 1.6, 10)
+    long_sword = Weapon("Long Sword", 6, 80, 1.7, 10)
 
     class Potion(object):
 
@@ -104,12 +105,12 @@ while True:
             __class__.monster_list.append(self)
 
     # Monster types
-    goblin = Monster("Goblin", 80, 80, 10, 30, 90, 20, False, False)
-    spider = Monster("Giant Spider", 70, 70, 10, 20, 90, 25, False, True)
+    goblin = Monster("Goblin", 80, 80, 10, 30, 90, 35, False, False)
+    spider = Monster("Giant Spider", 70, 70, 10, 20, 90, 40, False, True)
     orc = Monster("Orc", 115, 115, 25, 40, 85, 70, False, False)
-    skeleton = Monster("Skeleton", 90, 90, 20, 30, 90, 15, False, False)
+    skeleton = Monster("Skeleton", 90, 90, 20, 30, 90, 35, False, False)
     slime = Monster("Slime", 110, 110, 10, 15, 90, 70, True, False)
-    zombie = Monster("Zombie", 80, 80, 10, 30, 85, 20, True, True)
+    zombie = Monster("Zombie", 80, 80, 10, 30, 85, 40, True, True)
 
     rand_index = random.randrange(len(Monster.monster_list))
     rand_monster = Monster.monster_list[rand_index]
@@ -124,6 +125,7 @@ while True:
 
 
     class TavernOption(object):
+        temp_effect = 3
 
         def __init__(self, name, cost, effect1, effect2):
             self.name = name
@@ -143,7 +145,7 @@ while True:
                                                                         int((1 - player.armor.protection) * 100)
                                                                         , player.ap, player.max_ap, player.gold))
         else:
-            print("HP: {}/{}  Armor: {}%\nAP: {}/{}    Gold: {}".format(player.hp, player.max_hp,
+            print("HP: {}/{}✚  Armor: {}%♜\nAP: {}/{}►    Gold: {}Ⓖ".format(player.hp, player.max_hp,
                                                             int((1 - player.armor.protection) * 100)
                                                             ,player.ap, player.max_ap, player.gold))
         for item in player.inventory:
@@ -217,6 +219,7 @@ while True:
             for item in player.inventory:
                 print(str(item_num) + ": " + item.name + " | {} {}".format(item.effect_value, item.short_name))
                 item_num += 1
+            item_num = 1
             player_input = input("q: go back\n> ")
             if player_input == "1":
                 item_choice(0)
@@ -225,15 +228,28 @@ while True:
                 if len(player.inventory) >= 2:
                     item_choice(1)
                     break
+                else:
+                    invalid_option()
             elif player_input == "3":
                 if len(player.inventory) >= 3:
                     item_choice(2)
                     break
+                else:
+                    invalid_option()
             elif player_input.lower() == "q":
                 break
             else:
                 invalid_option()
-                item_num -= 1
+
+    def temp_effects():
+        if player.temp_armor is True:
+            drink.temp_effect -= 1
+            if drink.temp_effect <= 0:
+                player.armor.protection += 0.03
+                player.temp_armor = False
+                drink.temp_effect = 3
+                print("The drink wore off")
+
 
     def stagger_func():
         rand_stagger = random.randint(1, 100)
@@ -355,17 +371,17 @@ while True:
             else:
                 debuff_apply()
 
-    def recover():
+    def recover(chance):
         if player.poisoned is True:
             rand_recover = random.randint(1, 100)
-            if rand_recover <= 20:
+            if rand_recover <= chance:
                 player.poisoned = False
                 Game.already_poisoned = False
                 print("You recovered from the poison")
 
         if player.debuffed is True:
             rand_recover = random.randint(1, 100)
-            if rand_recover <= 20:
+            if rand_recover <= chance:
                 player.debuffed = False
                 Game.already_debuffed = False
                 player.max_ap = 12
@@ -422,7 +438,8 @@ while True:
         while Game.dungeon_loop is True:
             stagger_recover()
             poison_dmg_func()
-            recover()
+            recover(20)
+            temp_effects()
             while True:
                 monster_info()
                 alt_line()
@@ -454,6 +471,7 @@ while True:
                 elif player_input == "4":
                     player_damage(critical_cleave.ap_cost, critical_cleave.min_dmg, critical_cleave.max_dmg,
                                   critical_cleave.name, critical_cleave.crit_chance)
+                    break
                 elif player_input.lower() == "e":
                     if len(player.inventory) != 0:
                         inventory_func()
@@ -471,8 +489,8 @@ while True:
                 monster_respawn()
                 continue_loop = True
                 while continue_loop is True:
-                    player_input = input("1: Continue in the dungeon\n2: Go back to town\n> ")
-                    if player_input == "2":
+                    player_input = input("1: Continue in the dungeon\nq: Go back to town\n> ")
+                    if player_input.lower() == "q":
                         continue_loop = False
                         Game.dungeon_loop = False
                     elif player_input == "1":
@@ -508,6 +526,8 @@ while True:
                     else:
                         player.gold -= gambeson.cost
                         player.armor = gambeson
+                        if player.debuffed is True:
+                            player.armor.protection += 0.08
                         line()
                         print("You purchased {}!".format(gambeson.name))
                         line()
@@ -522,6 +542,8 @@ while True:
                     else:
                         player.gold -= chain_mail.cost
                         player.armor = chain_mail
+                        if player.debuffed is True:
+                            player.armor.protection += 0.08
                         line()
                         print("You purchased {}!".format(chain_mail.name))
                         line()
@@ -536,6 +558,8 @@ while True:
                     else:
                         player.gold -= plate_armor.cost
                         player.armor = plate_armor
+                        if player.debuffed is True:
+                            player.armor.protection += 0.08
                         line()
                         print("You purchased {}!".format(plate_armor.name))
                         line()
@@ -675,13 +699,15 @@ while True:
                     player_input = input("Welcome to the Tavern!\nWhat will you do?\n"
                                     "1: Buy a Drink | 5 gold (+2 AP +3% Armor temporarily)\n"
                                     "2: Buy a Meal | 10 gold (+40 HP +2 AP)\n"
-                                    "3: Buy a room for the night | 25 gold (restores HP and AP)\n"
+                                    "3: Buy a room for the night | 25 gold (restores HP & AP & removes debuffs)\n"
                                     "q: Go back to the tavern\n> ")
                     if player_input == "1":
                         if player.gold >= drink.cost:
                             player.gold -= drink.cost
                             player.ap += drink.effect1
-                            player.armor.protection -= drink.effect2
+                            if player.temp_armor is False:
+                                player.armor.protection -= drink.effect2
+                            player.temp_armor = True
                             if player.ap > player.max_ap:
                                 player.ap = player.max_ap
                             print("You purchased and drank the {}".format(drink.name))
@@ -702,12 +728,9 @@ while True:
                     elif player_input == "3":
                         if player.gold >= sleep.cost:
                             player.gold -= sleep.cost
-                            player.hp += sleep.effect1
-                            player.ap += sleep.effect2
-                            if player.hp > player.max_hp:
-                                player.hp = player.max_hp
-                            if player.ap > player.max_ap:
-                                player.ap = player.max_ap
+                            recover(100)
+                            player.hp = sleep.effect1
+                            player.ap = sleep.effect2
                             print("You purchased a room and went to {}\nYou wake up feeling great".format(sleep.name))
                         else:
                             no_gold()
@@ -723,12 +746,19 @@ while True:
             else:
                 invalid_option()
 
+    def inspect_gear():
+        print("Armor: {} (+{}% Armor, Poison Resist: {}, Weaken Resist: {})\n"
+              "Weapon: {} (+{} dmg, x{} crit multiplier)"
+              .format(player.armor.name, int((1 - player.armor.protection) * 100), player.armor.poison_resist,
+                player.armor.debuff_resist,
+                player.weapon.name, player.weapon.bonus_dmg, player.weapon.crit_mult))
+
     def town():
         if Game.dungeon_loop is False:
             town_loop = True
             while town_loop is True:
                 player_input = input("Welcome to the small village of Seronia!\nWhere will you go?\n1: Armor Shop\n"
-                                     "2: Weapon Shop\n3: Potion Shop\n4: Tavern\ne: Dungeon\nq: Quit\n> ")
+                                     "2: Weapon Shop\n3: Potion Shop\n4: Tavern\ne: Dungeon\nw: Inspect Gear\nq: Quit\n> ")
                 line()
                 if player_input == "1":
                     armor_shop()
@@ -742,6 +772,8 @@ while True:
                     town_loop = False
                     Game.dungeon_loop = True
                     dungeon()
+                elif player_input.lower() == "w":
+                    inspect_gear()
                 elif player_input.lower() == "q":
                     quit_func()
                     if Game.quit_boolean is True:
@@ -797,4 +829,7 @@ while True:
 -merchant who can upgrade your max hp and ap
 -Rob the shop but can't use shops for a certain period of time
 -Add a tavern where you can gamble
+-Sleep for free but less effective
+-buy a house
+-add save feature
 """
